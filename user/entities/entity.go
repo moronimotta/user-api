@@ -2,6 +2,7 @@ package entities
 
 import (
 	"errors"
+	"log/slog"
 	"time"
 	"user-auth/utils"
 
@@ -27,18 +28,10 @@ func (u *User) BeforeCreate() error {
 
 	hashedPassword, err := utils.HashPassword(u.Password)
 	if err != nil {
+		slog.Error("Failed to hash password", err)
 		return errors.New("failed to hash password")
 	}
 	u.Password = hashedPassword
 
 	return nil
-}
-
-// create Dummy user for testing purposes
-var UserEntity = User{
-	Name:     "John Doe",
-	Email:    "example1@example.com",
-	Password: "password",
-	Role:     "user",
-	Avatar:   "https://example.com/avatar.jpg",
 }

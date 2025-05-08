@@ -1,8 +1,9 @@
 package server
 
 import (
+	"log/slog"
 	"time"
-	dummy "user-auth/user/entities"
+	"user-auth/user/entities"
 	userHandlers "user-auth/user/handlers"
 	userRepo "user-auth/user/repositories"
 	userUsecases "user-auth/user/usecases"
@@ -46,11 +47,18 @@ func (s *Server) inicializeUserHttpHandler() {
 	userUsecase := userUsecases.NewUserUsecase(userPostgresRepository)
 	userHttpHandler := userHandlers.NewUserHttpHandler(*userUsecase)
 
-	dummyUser := dummy.UserEntity
-
 	userRoutes := s.app.Group("v1/user")
 	userRoutes.POST("", func(c *gin.Context) {
-		if err := userHttpHandler.Repo.CreateUser(&dummyUser); err != nil {
+		var input entities.User
+		// get body
+		if err := c.ShouldBindJSON(&input); err != nil {
+			slog.Error("Failed to bind JSON", err)
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := userHttpHandler.Repo.CreateUser(&input); err != nil {
+			slog.Error("Failed to create user", err)
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
@@ -60,10 +68,80 @@ func (s *Server) inicializeUserHttpHandler() {
 	userRoutes.GET("", func(c *gin.Context) {
 		user, err := userHttpHandler.Repo.GetAllUsers()
 		if err != nil {
+			slog.Error("Failed to get users", err)
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(200, gin.H{"users": user})
+	})
+
+	userRoutes.GET("/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		user, err := userHttpHandler.Repo.GetUserByID(id)
+		if err != nil {
+			slog.Error("Failed to get user", err)
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"user": user})
+	})
+
+	userRoutes.PUT("/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		var input entities.User
+		if err := c.ShouldBindJSON(&input); err != nil {
+			slog.Error("Failed to bind JSON", err)
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		input.ID = id
+		if err := userHttpHandler.Repo.UpdateUser(&input); err != nil {
+			slog.Error("Failed to update user", err)
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"message": "User updated successfully"})
+	})
+
+	userRoutes.DELETE("/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		if err := userHttpHandler.Repo.DeleteUser(id); err != nil {
+			slog.Error("Failed to delete user", err)
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"message": "User deleted successfully"})
+	})
+
+	userRoutes.GET("/account/:email", func(c *gin.Context) {
+		email := c.Param("email")
+		user, err := userHttpHandler.Repo.GetUserByEmail(email)
+		if err != nil {
+			slog.Error("Failed to get user", err)
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"user": user})
+	})
+
+	userRoutes.POST("/login", func(c *gin.Context) {
+		var input entities.User
+		if err := c.ShouldBindJSON(&input); err != nil {
+			slog.Error("Failed to bind JSON", err)
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		user, err := userHttpHandler.Repo.GetUserByEmailAndPassword(input.Email, input.Password)
+		if err != nil {
+			slog.Error("Failed to get user", err)
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		if user == nil {
+			c.JSON(401, gin.H{"error": "Invalid email or password"})
+			return
+		}
+		c.JSON(200, gin.H{"user": user})
 	})
 
 }

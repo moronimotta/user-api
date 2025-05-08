@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"log/slog"
 	"user-auth/db"
 	"user-auth/server"
 )
@@ -12,6 +13,7 @@ func main() {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
 
+	slog.Info("Connected to DB successfully")
 	server := server.NewServer(database)
 	server.Start()
 }
