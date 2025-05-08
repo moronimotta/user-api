@@ -74,3 +74,11 @@ func (u *UserUsecase) GetUserByEmailAndPassword(email, password string) (*entiti
 	}
 	return user, nil
 }
+
+func (u *UserUsecase) CheckAuthorizationRequest(role, authKey string) (bool, error) {
+	auth, err := u.UserRepository.CheckAuthorizationRequest(role, authKey)
+	if err != nil {
+		return false, err
+	}
+	return auth, nil
+}

@@ -2,7 +2,6 @@ package server
 
 import (
 	"log/slog"
-	"time"
 	"user-auth/user/entities"
 	userHandlers "user-auth/user/handlers"
 	userRepo "user-auth/user/repositories"
@@ -10,7 +9,6 @@ import (
 
 	"user-auth/db"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,14 +24,8 @@ func NewServer(db db.Database) *Server {
 	}
 }
 func (s *Server) Start() {
-	s.app.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
-		ExposeHeaders:    []string{"Content-Length"},
-		MaxAge:           12 * time.Hour,
-		AllowCredentials: true,
-	}))
+
+	s.initializeMiddlewares()
 
 	s.inicializeUserHttpHandler()
 
@@ -48,6 +40,7 @@ func (s *Server) inicializeUserHttpHandler() {
 	userHttpHandler := userHandlers.NewUserHttpHandler(*userUsecase)
 
 	userRoutes := s.app.Group("v1/user")
+
 	userRoutes.POST("", func(c *gin.Context) {
 		var input entities.User
 		// get body
@@ -65,7 +58,8 @@ func (s *Server) inicializeUserHttpHandler() {
 		c.JSON(200, gin.H{"message": "User created successfully"})
 	})
 
-	userRoutes.GET("", func(c *gin.Context) {
+	// Route with middleware
+	userRoutes.GET("", s.AuthMiddleware(userHttpHandler), func(c *gin.Context) {
 		user, err := userHttpHandler.Repo.GetAllUsers()
 		if err != nil {
 			slog.Error("Failed to get users", err)

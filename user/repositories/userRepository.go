@@ -10,4 +10,5 @@ type UserRepository interface {
 	DeleteUser(id string) error
 	GetUserByEmail(email string) (*entities.User, error)
 	GetUserByEmailAndPassword(email, password string) (*entities.User, error)
+	CheckAuthorizationRequest(role, authKey string) (bool, error)
 }

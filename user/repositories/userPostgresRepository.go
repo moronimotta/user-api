@@ -65,3 +65,14 @@ func (r *userPostgresRepository) GetUserByEmailAndPassword(email, password strin
 	}
 	return user, nil
 }
+
+func (r *userPostgresRepository) CheckAuthorizationRequest(role, authKey string) (bool, error) {
+	// check if there is a row with the given role and authKey
+	if err := r.db.GetDB().Model(&entities.User{}).Where("role = ? AND auth_key = ?", role, authKey).First(&entities.User{}).Error; err != nil {
+		if err.Error() == "record not found" {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
