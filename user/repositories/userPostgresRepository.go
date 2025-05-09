@@ -37,7 +37,7 @@ func (r *userPostgresRepository) GetAllUsers() ([]entities.User, error) {
 }
 
 func (r *userPostgresRepository) UpdateUser(user *entities.User) error {
-	if err := r.db.GetDB().Save(user).Error; err != nil {
+	if err := r.db.GetDB().Model(&entities.User{}).Where("id = ?", user.ID).Updates(user).Error; err != nil {
 		return err
 	}
 	return nil
