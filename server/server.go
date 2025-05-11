@@ -6,6 +6,7 @@ import (
 	userHandlers "user-auth/user/handlers"
 	userRepo "user-auth/user/repositories"
 	userUsecases "user-auth/user/usecases"
+	"user-auth/utils"
 
 	"user-auth/db"
 
@@ -18,6 +19,8 @@ type Server struct {
 }
 
 func NewServer(db db.Database) *Server {
+	utils.InitLogging()
+
 	return &Server{
 		app: gin.Default(),
 		db:  db,
@@ -55,9 +58,9 @@ func (s *Server) inicializeUserHttpHandler() {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		slog.Info("User created successfully", "user", input.Email)
 		c.JSON(200, gin.H{"message": "User created successfully"})
 	})
-
 	// Route with middleware
 	userRoutes.GET("", s.AuthMiddleware(userHttpHandler), func(c *gin.Context) {
 		user, err := userHttpHandler.Repo.GetAllUsers()
@@ -66,6 +69,7 @@ func (s *Server) inicializeUserHttpHandler() {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		slog.Info("Get all users", "users")
 		c.JSON(200, gin.H{"users": user})
 	})
 
@@ -77,6 +81,7 @@ func (s *Server) inicializeUserHttpHandler() {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		slog.Info("Get user by ID", "user", user.ID)
 		c.JSON(200, gin.H{"user": user})
 	})
 
@@ -94,6 +99,7 @@ func (s *Server) inicializeUserHttpHandler() {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		slog.Info("User updated successfully", "user", input.ID)
 		c.JSON(200, gin.H{"message": "User updated successfully"})
 	})
 
@@ -104,6 +110,7 @@ func (s *Server) inicializeUserHttpHandler() {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		slog.Info("User deleted successfully", "user", id)
 		c.JSON(200, gin.H{"message": "User deleted successfully"})
 	})
 
@@ -115,6 +122,7 @@ func (s *Server) inicializeUserHttpHandler() {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		slog.Info("Get user by email", "user", user.Email)
 		c.JSON(200, gin.H{"user": user})
 	})
 
@@ -135,6 +143,7 @@ func (s *Server) inicializeUserHttpHandler() {
 			c.JSON(401, gin.H{"error": "Invalid email or password"})
 			return
 		}
+		slog.Info("User logged in successfully", "user", user.Email)
 		c.JSON(200, gin.H{"user": user})
 	})
 

@@ -35,8 +35,6 @@ func (s *Server) initializeMiddlewares() {
 // Authorization Middleware
 func (s *Server) AuthMiddleware(userHttpHandler *userHandlers.UserHttpHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Here you can implement your authentication logic
-		// For example, check for a token in the headers
 		userRole := c.Request.Header.Get("Role")
 		token := c.Request.Header.Get("Authorization")
 		if token == "" || userRole != "admin" {
@@ -45,7 +43,6 @@ func (s *Server) AuthMiddleware(userHttpHandler *userHandlers.UserHttpHandler) g
 			return
 		}
 
-		// Validate the token (this is just a placeholder, implement your own logic)
 		ok, err := userHttpHandler.Repo.CheckAuthorizationRequest(userRole, token)
 		if err != nil {
 			slog.Error("Failed to check authorization request", err)
