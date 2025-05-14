@@ -62,7 +62,8 @@ func (s *Server) inicializeUserHttpHandler() {
 		c.JSON(200, gin.H{"message": "User created successfully"})
 	})
 	// Route with middleware
-	userRoutes.GET("", s.AuthMiddleware(userHttpHandler), func(c *gin.Context) {
+	// s.AuthMiddleware(userHttpHandler),
+	userRoutes.GET("", func(c *gin.Context) {
 		user, err := userHttpHandler.Repo.GetAllUsers()
 		if err != nil {
 			slog.Error("Failed to get users", err)

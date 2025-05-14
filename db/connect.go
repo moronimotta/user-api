@@ -3,20 +3,16 @@ package db
 
 import (
 	"log"
+	"user-auth/confs"
 	user "user-auth/user/entities"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func Connect() (Database, error) {
-	config := Config{}
-	err := config.LoadConfig()
-	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
-	}
+func Connect(confs confs.Config) (Database, error) {
 
-	db, err := gorm.Open(postgres.Open(config.DBURL), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(confs.DBURL), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Error connecting to database: %v", err)
 	}
