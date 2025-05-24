@@ -21,14 +21,14 @@ type RabbitMQServer struct {
 	topicName     string
 }
 
-func NewRabbitMQServer(db db.Database, url, queueName, topicName string) *RabbitMQServer {
+func NewRabbitMQServer(db db.Database) *RabbitMQServer {
 	utils.InitLogging()
 
 	return &RabbitMQServer{
 		db:            db,
 		connectionUrl: os.Getenv("RABBITMQ_URL"),
-		queueName:     queueName,
-		topicName:     topicName,
+		queueName:     os.Getenv("RABBITMQ_QUEUE_NAME"),
+		topicName:     os.Getenv("RABBITMQ_TOPIC_NAME"),
 	}
 }
 func (s *RabbitMQServer) Start() {

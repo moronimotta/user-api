@@ -10,14 +10,13 @@ import (
 
 func main() {
 	// load config
-	config := confs.Config{}
-	err := config.LoadConfig()
+	err := confs.LoadConfig()
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
 	// connect to database Postgres
-	database, err := db.Connect(config)
+	database, err := db.Connect()
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
@@ -32,7 +31,7 @@ func main() {
 
 		time.Sleep(5 * time.Second)
 		log.Println("Starting RabbitMQ server...")
-		rabbitServer := server.NewRabbitMQServer(database, config.RabbitMQURL, config.QueueName, config.ExchangeName)
+		rabbitServer := server.NewRabbitMQServer(database)
 		rabbitServer.Start()
 	}()
 

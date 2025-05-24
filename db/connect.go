@@ -3,16 +3,16 @@ package db
 
 import (
 	"log"
-	"user-auth/confs"
+	"os"
 	user "user-auth/user/entities"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func Connect(confs confs.Config) (Database, error) {
+func Connect() (Database, error) {
 
-	db, err := gorm.Open(postgres.Open(confs.DBURL), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(os.Getenv("DB_URL")), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Error connecting to database: %v", err)
 	}
