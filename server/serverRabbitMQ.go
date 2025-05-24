@@ -2,6 +2,7 @@ package server
 
 import (
 	"log"
+	"os"
 	"user-auth/user/handlers"
 	"user-auth/user/repositories"
 	"user-auth/user/usecases"
@@ -14,35 +15,35 @@ import (
 )
 
 type RabbitMQServer struct {
-	db           db.Database
-	rabbitmqUrl  string
-	queueName    string
-	exchangeName string
+	db            db.Database
+	connectionUrl string
+	queueName     string
+	topicName     string
 }
 
-func NewRabbitMQServer(db db.Database, url, queueName, exchangeName string) *RabbitMQServer {
+func NewRabbitMQServer(db db.Database, url, queueName, topicName string) *RabbitMQServer {
 	utils.InitLogging()
 
 	return &RabbitMQServer{
-		db:           db,
-		rabbitmqUrl:  url,
-		queueName:    queueName,
-		exchangeName: exchangeName,
+		db:            db,
+		connectionUrl: os.Getenv("RABBITMQ_URL"),
+		queueName:     queueName,
+		topicName:     topicName,
 	}
 }
 func (s *RabbitMQServer) Start() {
-	conn, err := amqp.Dial(s.rabbitmqUrl)
-	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
-	}
-
 	// Setup repositories and handler
 	userPostgresRepository := repositories.NewUserPostgresRepository(s.db)
 	rabbitMqUserRepo := usecases.NewUserEventUsecase(userPostgresRepository)
 	rabbitMqHandler := handlers.NewUserRabbitMQHandler(*rabbitMqUserRepo)
 
 	// CONSUMER
-	messageWorker.Worker(conn, s.queueName, s.exchangeName,
+	var consumerInput messageWorker.Consumer
+	consumerInput.ConnectionURL = os.Getenv("RABBITMQ_URL")
+	consumerInput.QueueName = s.queueName
+	consumerInput.TopicName = s.topicName
+
+	messageWorker.Listen(consumerInput,
 		func(msg amqp.Delivery) {
 			err := rabbitMqHandler.Repo.EventBus(string(msg.Body))
 			if err != nil {

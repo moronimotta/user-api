@@ -26,7 +26,11 @@ func (u *UserEventUsecase) EventBus(event string) error {
 	}
 	userEntity := &entities.User{}
 
-	if err := userEntity.Unmarshal(eventData.Data); err != nil {
+	dataBytes, ok := eventData.Data.([]byte)
+	if !ok {
+		return errors.New("event data is not of type []byte")
+	}
+	if err := userEntity.Unmarshal(dataBytes); err != nil {
 		return err
 	}
 	switch eventData.Event {
