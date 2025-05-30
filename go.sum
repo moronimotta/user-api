@@ -74,6 +74,8 @@ github.com/moronimotta/message-worker-module v0.0.0-20250514174714-4f7dd7c6d70d 
 github.com/moronimotta/message-worker-module v0.0.0-20250514174714-4f7dd7c6d70d/go.mod h1:acNbAXNYeOT/fzi8KLk7Zwf6mggDe//fCV7gtQcFwCI=
 github.com/moronimotta/message-worker-module v0.0.0-20250524212518-58870907c7c9 h1:UHIduaLhGcr3nVRWfyratXaLE1z9362OWwxdGQqxJg8=
 github.com/moronimotta/message-worker-module v0.0.0-20250524212518-58870907c7c9/go.mod h1:acNbAXNYeOT/fzi8KLk7Zwf6mggDe//fCV7gtQcFwCI=
+github.com/moronimotta/message-worker-module v0.0.0-20250529182601-66443a259197 h1:Ku7vSjso2Et0WQ7uj+irn803XB02Ddn2WBOgnix9Y00=
+github.com/moronimotta/message-worker-module v0.0.0-20250529182601-66443a259197/go.mod h1:acNbAXNYeOT/fzi8KLk7Zwf6mggDe//fCV7gtQcFwCI=
 github.com/pelletier/go-toml/v2 v2.2.4 h1:mye9XuhQ6gvn5h28+VilKrrPoQVanw5PMw/TB0t5Ec4=
 github.com/pelletier/go-toml/v2 v2.2.4/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

@@ -42,11 +42,12 @@ func (s *Server) inicializeUserHttpHandler() {
 	userUsecase := userUsecases.NewUserUsecase(userPostgresRepository)
 	userHttpHandler := userHandlers.NewUserHttpHandler(*userUsecase)
 
+	rabbitMqHandler := userHandlers.NewRabbitMqHandler(s.db)
+
 	userRoutes := s.app.Group("v1/user")
 
 	userRoutes.POST("", func(c *gin.Context) {
 		var input entities.User
-		// get body
 		if err := c.ShouldBindJSON(&input); err != nil {
 			slog.Error("Failed to bind JSON", err)
 			c.JSON(400, gin.H{"error": err.Error()})
@@ -58,9 +59,21 @@ func (s *Server) inicializeUserHttpHandler() {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+
+		dataInput := map[string]string{
+			"email":   input.Email,
+			"name":    input.Name,
+			"user_id": input.ID,
+		}
+
+		if err := rabbitMqHandler.PublishMessage("finance-api", "user.created", dataInput); err != nil {
+			slog.Error("Failed to publish message", err)
+		}
+
 		slog.Info("User created successfully", "user", input.Email)
 		c.JSON(200, gin.H{"message": "User created successfully"})
 	})
+
 	// Route with middleware
 	// s.AuthMiddleware(userHttpHandler),
 	userRoutes.GET("", func(c *gin.Context) {
@@ -95,12 +108,35 @@ func (s *Server) inicializeUserHttpHandler() {
 			return
 		}
 		input.ID = id
+
+		dataInput := map[string]string{}
+		if input.Email != "" {
+			dataInput["email"] = input.Email
+		}
+		if input.Name != "" {
+			dataInput["name"] = input.Name
+		}
+
 		if err := userHttpHandler.Repo.UpdateUser(&input); err != nil {
 			slog.Error("Failed to update user", err)
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
-		slog.Info("User updated successfully", "user", input.ID)
+
+		updatedUser, err := userHttpHandler.Repo.GetUserByID(id)
+		if err != nil {
+			slog.Error("Failed to get updated user", err)
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+
+		dataInput["external_id"] = updatedUser.ExternalID
+
+		if err := rabbitMqHandler.PublishMessage("finance-api", "user.updated", dataInput); err != nil {
+			slog.Error("Failed to publish message", err)
+		}
+
+		slog.Info("User updated successfully", "user", updatedUser.ID)
 		c.JSON(200, gin.H{"message": "User updated successfully"})
 	})
 

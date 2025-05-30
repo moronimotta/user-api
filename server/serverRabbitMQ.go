@@ -4,8 +4,6 @@ import (
 	"log"
 	"os"
 	"user-auth/user/handlers"
-	"user-auth/user/repositories"
-	"user-auth/user/usecases"
 	"user-auth/utils"
 
 	"user-auth/db"
@@ -33,9 +31,7 @@ func NewRabbitMQServer(db db.Database) *RabbitMQServer {
 }
 func (s *RabbitMQServer) Start() {
 	// Setup repositories and handler
-	userPostgresRepository := repositories.NewUserPostgresRepository(s.db)
-	rabbitMqUserRepo := usecases.NewUserEventUsecase(userPostgresRepository)
-	rabbitMqHandler := handlers.NewUserRabbitMQHandler(*rabbitMqUserRepo)
+	rabbitMqHandler := handlers.NewRabbitMqHandler(s.db)
 
 	// CONSUMER
 	var consumerInput messageWorker.Consumer
@@ -45,7 +41,13 @@ func (s *RabbitMQServer) Start() {
 
 	messageWorker.Listen(consumerInput,
 		func(msg amqp.Delivery) {
-			err := rabbitMqHandler.Repo.EventBus(string(msg.Body))
+			var event messageWorker.Event
+			err := event.Unmarshal(msg.Body)
+			if err != nil {
+				log.Printf("Failed to unmarshal message: %v", err)
+				return
+			}
+			err = rabbitMqHandler.EventBus(event)
 			if err != nil {
 				log.Printf("EventBus error: %v", err)
 			}

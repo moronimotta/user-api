@@ -21,7 +21,7 @@ func main() {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
 
-	// ruin RabbitMQ
+	// run RabbitMQ
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {

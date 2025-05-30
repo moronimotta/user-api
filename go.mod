@@ -7,7 +7,7 @@ require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
-	github.com/moronimotta/message-worker-module v0.0.0-20250524212518-58870907c7c9
+	github.com/moronimotta/message-worker-module v0.0.0-20250529182601-66443a259197
 	github.com/rabbitmq/amqp091-go v1.10.0
 	golang.org/x/crypto v0.38.0
 	gorm.io/driver/postgres v1.5.11
