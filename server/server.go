@@ -180,6 +180,16 @@ func (s *Server) inicializeUserHttpHandler() {
 			c.JSON(401, gin.H{"error": "Invalid email or password"})
 			return
 		}
+
+		// generate JWT token
+		token, err := utils.GenerateJWT(user.ID, user.Email)
+		if err != nil {
+			slog.Error("Failed to generate JWT token", err)
+			c.JSON(500, gin.H{"error": "Failed to generate token"})
+			return
+		}
+		c.SetCookie("token", token, 3600, "/", "", false, true)
+
 		slog.Info("User logged in successfully", "user", user.Email)
 		c.JSON(200, gin.H{"user": user})
 	})

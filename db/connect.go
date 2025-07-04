@@ -2,9 +2,10 @@
 package db
 
 import (
+	user "user-auth/user/entities"
+
 	"log"
 	"os"
-	user "user-auth/user/entities"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

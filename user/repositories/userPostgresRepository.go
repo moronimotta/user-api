@@ -1,8 +1,10 @@
 package repositories
 
 import (
+	"errors"
 	"user-auth/db"
 	"user-auth/user/entities"
+	"user-auth/utils"
 )
 
 type userPostgresRepository struct {
@@ -59,10 +61,17 @@ func (r *userPostgresRepository) GetUserByEmail(email string) (*entities.User, e
 }
 
 func (r *userPostgresRepository) GetUserByEmailAndPassword(email, password string) (*entities.User, error) {
+	// First, get the user by email only
 	user := &entities.User{}
-	if err := r.db.GetDB().Where("email = ? AND password = ?", email, password).First(user).Error; err != nil {
+	if err := r.db.GetDB().Where("email = ?", email).First(user).Error; err != nil {
 		return nil, err
 	}
+
+	// Then verify the password using a hash comparison function
+	if !utils.CheckPasswordHash(password, user.Password) {
+		return nil, errors.New("invalid credentials")
+	}
+
 	return user, nil
 }
 
