@@ -12,17 +12,20 @@ import (
 	usescases "user-auth/user/usecases"
 
 	messageWorker "github.com/moronimotta/message-worker-module"
+	"github.com/redis/go-redis/v9"
 )
 
 type RabbitMqHandler struct {
 	usescases.UserUsecase
+	redisClient *redis.Client
 }
 
-func NewRabbitMqHandler(db db.Database) *RabbitMqHandler {
+func NewRabbitMqHandler(db db.Database, redisClient *redis.Client) *RabbitMqHandler {
 	repoInput := repositories.NewUserPostgresRepository(db)
 	usecasesInput := usecases.NewUserUsecase(repoInput)
 	return &RabbitMqHandler{
-		*usecasesInput,
+		UserUsecase: *usecasesInput,
+		redisClient: redisClient,
 	}
 }
 

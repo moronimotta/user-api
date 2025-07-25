@@ -2,6 +2,7 @@ package server
 
 import (
 	"log/slog"
+	"time"
 	"user-auth/user/entities"
 	userHandlers "user-auth/user/handlers"
 	userRepo "user-auth/user/repositories"
@@ -11,19 +12,22 @@ import (
 	"user-auth/db"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 type Server struct {
-	app *gin.Engine
-	db  db.Database
+	app   *gin.Engine
+	db    db.Database
+	redis *redis.Client
 }
 
-func NewServer(db db.Database) *Server {
+func NewServer(db db.Database, redisClient *redis.Client) *Server {
 	utils.InitLogging()
 
 	return &Server{
-		app: gin.Default(),
-		db:  db,
+		app:   gin.Default(),
+		db:    db,
+		redis: redisClient,
 	}
 }
 func (s *Server) Start() {
@@ -42,7 +46,7 @@ func (s *Server) inicializeUserHttpHandler() {
 	userUsecase := userUsecases.NewUserUsecase(userPostgresRepository)
 	userHttpHandler := userHandlers.NewUserHttpHandler(*userUsecase)
 
-	rabbitMqHandler := userHandlers.NewRabbitMqHandler(s.db)
+	rabbitMqHandler := userHandlers.NewRabbitMqHandler(s.db, s.redis)
 
 	userRoutes := s.app.Group("v1/user")
 
@@ -182,13 +186,19 @@ func (s *Server) inicializeUserHttpHandler() {
 		}
 
 		// generate JWT token
-		token, err := utils.GenerateJWT(user.ID, user.Email)
+		token, err := utils.GenerateJWTWithRole(user.ID, user.Email, user.Role)
 		if err != nil {
 			slog.Error("Failed to generate JWT token", err)
 			c.JSON(500, gin.H{"error": "Failed to generate token"})
 			return
 		}
+
+		// Set the JWT token in a cookie
 		c.SetCookie("token", token, 3600, "/", "", false, true)
+		// set cache on redis
+		if err := s.redis.Set(c, user.ID, token, 3600*time.Second).Err(); err != nil {
+			slog.Error("Failed to set cache on Redis", err)
+		}
 
 		slog.Info("User logged in successfully", "user", user.Email)
 		c.JSON(200, gin.H{"user": user})

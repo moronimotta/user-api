@@ -3,7 +3,7 @@ package server
 import (
 	"log/slog"
 	"time"
-	userHandlers "user-auth/user/handlers"
+	"user-auth/utils"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -32,31 +32,32 @@ func (s *Server) initializeMiddlewares() {
 	}))
 }
 
-// Authorization Middleware
-func (s *Server) AuthMiddleware(userHttpHandler *userHandlers.UserHttpHandler) gin.HandlerFunc {
+func (s *Server) ValidateRSAKeyMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userRole := c.Request.Header.Get("Role")
-		token := c.Request.Header.Get("Authorization")
-		if token == "" || userRole != "admin" {
+		if c.Request.Header.Get("Authorization") == "" {
 			c.JSON(401, gin.H{"error": "Unauthorized"})
 			c.Abort()
 			return
 		}
-
-		ok, err := userHttpHandler.Repo.CheckAuthorizationRequest(userRole, token)
-		if err != nil {
-			slog.Error("Failed to check authorization request", err)
-			c.JSON(500, gin.H{"error": "Internal Server Error"})
+		ok := utils.ValidateJWTToken(c.Request.Header.Get("Authorization"))
+		if !ok {
+			c.JSON(401, gin.H{"error": "Unauthorized"})
 			c.Abort()
 			return
 		}
-		if !ok {
+		c.Next()
+
+	}
+}
+
+func (s *Server) AdminPrivilegeMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role := c.Request.Header.Get("Role")
+		if role != "admin" {
 			c.JSON(403, gin.H{"error": "Forbidden"})
 			c.Abort()
 			return
 		}
-
-		// If token is valid, proceed to the next handler
 		c.Next()
 	}
 }
