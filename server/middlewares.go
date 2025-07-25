@@ -39,6 +39,10 @@ func (s *Server) ValidateRSAKeyMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		// remove Bearer prefix if present
+		if len(c.Request.Header.Get("Authorization")) > 7 && c.Request.Header.Get("Authorization")[:7] == "Bearer " {
+			c.Request.Header.Set("Authorization", c.Request.Header.Get("Authorization")[7:])
+		}
 		ok := utils.ValidateJWTToken(c.Request.Header.Get("Authorization"))
 		if !ok {
 			c.JSON(401, gin.H{"error": "Unauthorized"})

@@ -167,6 +167,11 @@ func (s *Server) inicializeUserHttpHandler() {
 		c.JSON(200, gin.H{"user": user})
 	})
 
+	userRoutes.GET("/test", s.ValidateRSAKeyMiddleware(), func(c *gin.Context) {
+		slog.Info("Test route hit")
+		c.JSON(200, gin.H{"message": "Test successful"})
+	})
+
 	userRoutes.POST("/login", func(c *gin.Context) {
 		var input entities.User
 		if err := c.ShouldBindJSON(&input); err != nil {
