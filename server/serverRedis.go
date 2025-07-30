@@ -20,7 +20,7 @@ type RedisServer struct {
 
 func NewRedisServer(db db.Database) *RedisServer {
 	utils.InitLogging()
-
+	// TODO: Change Redis PORT
 	connectionUrl := os.Getenv("REDIS_URL")
 	if connectionUrl == "" {
 		connectionUrl = "redis://localhost:6379" // Default fallback
