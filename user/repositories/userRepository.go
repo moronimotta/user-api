@@ -11,4 +11,5 @@ type UserRepository interface {
 	GetUserByEmail(email string) (*entities.User, error)
 	GetUserByEmailAndPassword(email, password string) (*entities.User, error)
 	CheckAuthorizationRequest(role, authKey string) (bool, error)
+	GetUserByExternalID(externalID string) (*entities.User, error)
 }

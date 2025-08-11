@@ -74,6 +74,10 @@ func (s *Server) inicializeUserHttpHandler() {
 			slog.Error("Failed to publish message", err)
 		}
 
+		if err := rabbitMqHandler.PublishMessage("akademia-api", "user.created", dataInput); err != nil {
+			slog.Error("Failed to publish message", err)
+		}
+
 		slog.Info("User created successfully", "user", input.Email)
 		c.JSON(200, gin.H{"message": "User created successfully"})
 	})
@@ -170,6 +174,18 @@ func (s *Server) inicializeUserHttpHandler() {
 	userRoutes.GET("/test", s.ValidateRSAKeyMiddleware(), func(c *gin.Context) {
 		slog.Info("Test route hit")
 		c.JSON(200, gin.H{"message": "Test successful"})
+	})
+
+	userRoutes.GET("/external/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		user, err := userHttpHandler.Repo.GetUserByExternalID(id)
+		if err != nil {
+			slog.Error("Failed to get user", err)
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+		slog.Info("Get user by external ID", "user", user.ID)
+		c.JSON(200, gin.H{"user": user})
 	})
 
 	userRoutes.POST("/login", func(c *gin.Context) {

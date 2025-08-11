@@ -85,3 +85,11 @@ func (r *userPostgresRepository) CheckAuthorizationRequest(role, authKey string)
 	}
 	return true, nil
 }
+
+func (r *userPostgresRepository) GetUserByExternalID(externalID string) (*entities.User, error) {
+	user := &entities.User{}
+	if err := r.db.GetDB().Where("external_id = ?", externalID).First(user).Error; err != nil {
+		return nil, err
+	}
+	return user, nil
+}

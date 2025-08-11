@@ -83,6 +83,14 @@ func (u *UserUsecase) CheckAuthorizationRequest(role, authKey string) (bool, err
 	return auth, nil
 }
 
+func (u *UserUsecase) GetUserByExternalID(externalID string) (*entities.User, error) {
+	user, err := u.UserRepository.GetUserByExternalID(externalID)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 // func (u *UserUsecase) ValidateRSAKey(rsaKey string) (bool, error) {
 // 	// This method will be used to validate the RSA key.
 // 	// It will send a message to the RabbitMQ queue to validate the RSA key.
