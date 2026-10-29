@@ -51,11 +51,29 @@ func (s *Server) inicializeUserHttpHandler() {
 	userRoutes := s.app.Group("v1/user")
 
 	userRoutes.POST("", func(c *gin.Context) {
+		origin := c.GetHeader("X-Request-Origin")
+		if origin != "" && origin != "barber-app" {
+			c.JSON(400, gin.H{"error": "X-Request-Origin must be barber-app when provided"})
+			return
+		}
+
 		var input entities.User
 		if err := c.ShouldBindJSON(&input); err != nil {
 			slog.Error("Failed to bind JSON", err)
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
+		}
+
+		// Client-supplied roles are never trusted. Only a verified admin token
+		// can create a barber account; all other registrations are customers.
+		requestedRole := input.Role
+		input.Role = "customer"
+		if requestedRole == "barber" {
+			if !isAdminRequest(c) {
+				c.JSON(403, gin.H{"error": "admin authorization required to create a barber"})
+				return
+			}
+			input.Role = "barber"
 		}
 
 		if err := userHttpHandler.Repo.CreateUser(&input); err != nil {
@@ -68,6 +86,7 @@ func (s *Server) inicializeUserHttpHandler() {
 			"email":   input.Email,
 			"name":    input.Name,
 			"user_id": input.ID,
+			"role":    input.Role,
 		}
 
 		if err := rabbitMqHandler.PublishMessage("finance-api", "user.created", dataInput); err != nil {
@@ -77,9 +96,14 @@ func (s *Server) inicializeUserHttpHandler() {
 		if err := rabbitMqHandler.PublishMessage("akademia-api", "user.created", dataInput); err != nil {
 			slog.Error("Failed to publish message", err)
 		}
+		if origin == "barber-app" {
+			if err := rabbitMqHandler.PublishMessage("barber-app", "user.created", dataInput); err != nil {
+				slog.Error("Failed to publish message", err)
+			}
+		}
 
 		slog.Info("User created successfully", "user", input.Email)
-		c.JSON(200, gin.H{"message": "User created successfully"})
+		c.JSON(201, gin.H{"message": "User created successfully", "user_id": input.ID})
 	})
 
 	// Route with middleware
@@ -188,6 +212,11 @@ func (s *Server) inicializeUserHttpHandler() {
 		c.JSON(200, gin.H{"user": user})
 	})
 
+	userRoutes.GET("/check-rsa", s.ValidateRSAKeyMiddleware(), func(c *gin.Context) {
+		slog.Info("RSA key is valid")
+		c.JSON(200, gin.H{"message": "RSA key is valid"})
+	})
+
 	userRoutes.POST("/login", func(c *gin.Context) {
 		var input entities.User
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -216,6 +245,7 @@ func (s *Server) inicializeUserHttpHandler() {
 
 		// Set the JWT token in a cookie
 		c.SetCookie("token", token, 3600, "/", "", false, true)
+		// TODO: SET HERE ON CACHE
 		// set cache on redis
 		if err := s.redis.Set(c, user.ID, token, 3600*time.Second).Err(); err != nil {
 			slog.Error("Failed to set cache on Redis", err)
@@ -224,5 +254,7 @@ func (s *Server) inicializeUserHttpHandler() {
 		slog.Info("User logged in successfully", "user", user.Email)
 		c.JSON(200, gin.H{"user": user})
 	})
+
+	// route to check user token signature
 
 }

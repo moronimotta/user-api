@@ -1,7 +1,6 @@
 package server
 
 import (
-	"log"
 	"os"
 	"user-auth/user/handlers"
 	"user-auth/utils"
@@ -9,7 +8,6 @@ import (
 	"user-auth/db"
 
 	messageWorker "github.com/moronimotta/message-worker-module"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -43,17 +41,8 @@ func (s *RabbitMQServer) Start() {
 	consumerInput.TopicName = s.topicName
 
 	messageWorker.Listen(consumerInput,
-		func(msg amqp.Delivery) {
-			var event messageWorker.Event
-			err := event.Unmarshal(msg.Body)
-			if err != nil {
-				log.Printf("Failed to unmarshal message: %v", err)
-				return
-			}
-			err = rabbitMqHandler.EventBus(event)
-			if err != nil {
-				log.Printf("EventBus error: %v", err)
-			}
+		func(event messageWorker.Event) error {
+			return rabbitMqHandler.EventBus(event)
 		},
 	)
 

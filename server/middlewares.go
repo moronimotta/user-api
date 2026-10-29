@@ -2,6 +2,7 @@ package server
 
 import (
 	"log/slog"
+	"strings"
 	"time"
 	"user-auth/utils"
 
@@ -27,7 +28,7 @@ func (s *Server) initializeMiddlewares() {
 	s.app.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{"GET", "POST", "PUT", "DELETE"},
-		AllowHeaders: []string{"Origin", "Content-Type", "Accept"},
+		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-Origin"},
 		MaxAge:       12 * time.Hour,
 	}))
 }
@@ -56,12 +57,27 @@ func (s *Server) ValidateRSAKeyMiddleware() gin.HandlerFunc {
 
 func (s *Server) AdminPrivilegeMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		role := c.Request.Header.Get("Role")
-		if role != "admin" {
+		if !isAdminRequest(c) {
 			c.JSON(403, gin.H{"error": "Forbidden"})
 			c.Abort()
 			return
 		}
 		c.Next()
 	}
+}
+
+func isAdminRequest(c *gin.Context) bool {
+	authorization := strings.TrimSpace(c.GetHeader("Authorization"))
+	if strings.HasPrefix(authorization, "Bearer ") {
+		authorization = strings.TrimSpace(strings.TrimPrefix(authorization, "Bearer "))
+	}
+	if authorization == "" {
+		return false
+	}
+	claims, err := utils.ParseJWTTokenClaims(authorization)
+	if err != nil {
+		return false
+	}
+	role, ok := claims["role"].(string)
+	return ok && role == "admin"
 }
