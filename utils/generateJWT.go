@@ -23,6 +23,7 @@ func GenerateJWTWithRole(id, email, role string) (string, error) {
 	}
 
 	claims := jwt.MapClaims{
+		"sub":   id,
 		"id":    id,
 		"email": email,
 		"role":  role,

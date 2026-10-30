@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 	"user-auth/utils"
 
@@ -18,10 +19,49 @@ type User struct {
 	CreatedAt  string `json:"created_at"`
 	UpdatedAt  string `json:"updated_at"`
 	DeletedAt  string `json:"deleted_at"`
-	Role       string `json:"role" gorm:"default:'user'"` // default role is user
+	Role       string `json:"role" gorm:"default:'customer'"`
 	AuthKey    string `json:"auth_key"`
 	Avatar     string `json:"avatar"`      //It will be saved in the S3 bucket
 	ExternalID string `json:"external_id"` // Link to Finance API
+}
+
+const (
+	RoleAdmin    = "admin"
+	RoleBarber   = "barber"
+	RoleCustomer = "customer"
+)
+
+// CanonicalRole keeps API and token role claims within the supported role set.
+// The historical "user" role is treated as a customer for existing accounts.
+func CanonicalRole(role string) string {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case RoleAdmin:
+		return RoleAdmin
+	case RoleBarber:
+		return RoleBarber
+	default:
+		return RoleCustomer
+	}
+}
+
+// UserResponse is the public profile shape. It intentionally excludes password
+// hashes, auth keys, and payment-provider identifiers.
+type UserResponse struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	Role      string `json:"role"`
+	Avatar    string `json:"avatar"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+func NewUserResponse(user *User) UserResponse {
+	return UserResponse{
+		ID: user.ID, Name: user.Name, Email: user.Email,
+		Role: CanonicalRole(user.Role), Avatar: user.Avatar,
+		CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
+	}
 }
 
 func (u *User) BeforeCreate() error {
