@@ -66,14 +66,14 @@ func (s *Server) inicializeUserHttpHandler() {
 
 		// Client-supplied roles are never trusted. Only a verified admin token
 		// can create a barber account; all other registrations are customers.
-		requestedRole := input.Role
-		input.Role = "customer"
-		if requestedRole == "barber" {
+		requestedRole := entities.CanonicalRole(input.Role)
+		input.Role = entities.RoleCustomer
+		if requestedRole == entities.RoleBarber {
 			if !isAdminRequest(c) {
 				c.JSON(403, gin.H{"error": "admin authorization required to create a barber"})
 				return
 			}
-			input.Role = "barber"
+			input.Role = entities.RoleBarber
 		}
 
 		if err := userHttpHandler.Repo.CreateUser(&input); err != nil {
@@ -103,12 +103,24 @@ func (s *Server) inicializeUserHttpHandler() {
 		}
 
 		slog.Info("User created successfully", "user", input.Email)
-		c.JSON(201, gin.H{"message": "User created successfully", "user_id": input.ID})
+		c.JSON(201, gin.H{
+			"message": "User created successfully",
+			"user_id": input.ID,
+			"user":    entities.NewUserResponse(&input),
+		})
 	})
 
-	// Route with middleware
-	// s.AuthMiddleware(userHttpHandler),
-	userRoutes.GET("", func(c *gin.Context) {
+	userRoutes.GET("/me", s.AuthenticatedUserMiddleware(), func(c *gin.Context) {
+		userID := c.GetString("auth_user_id")
+		user, err := userHttpHandler.Repo.GetUserByID(userID)
+		if err != nil {
+			c.JSON(404, gin.H{"error": "User not found"})
+			return
+		}
+		c.JSON(200, gin.H{"user": entities.NewUserResponse(user)})
+	})
+
+	userRoutes.GET("", s.AdminPrivilegeMiddleware(), func(c *gin.Context) {
 		user, err := userHttpHandler.Repo.GetAllUsers()
 		if err != nil {
 			slog.Error("Failed to get users", err)
@@ -116,11 +128,19 @@ func (s *Server) inicializeUserHttpHandler() {
 			return
 		}
 		slog.Info("Get all users", "users")
-		c.JSON(200, gin.H{"users": user})
+		response := make([]entities.UserResponse, 0, len(user))
+		for index := range user {
+			response = append(response, entities.NewUserResponse(&user[index]))
+		}
+		c.JSON(200, gin.H{"users": response})
 	})
 
-	userRoutes.GET("/:id", func(c *gin.Context) {
+	userRoutes.GET("/:id", s.AuthenticatedUserMiddleware(), func(c *gin.Context) {
 		id := c.Param("id")
+		if !canAccessUser(c, id) {
+			c.JSON(403, gin.H{"error": "Forbidden"})
+			return
+		}
 		user, err := userHttpHandler.Repo.GetUserByID(id)
 		if err != nil {
 			slog.Error("Failed to get user", err)
@@ -128,18 +148,26 @@ func (s *Server) inicializeUserHttpHandler() {
 			return
 		}
 		slog.Info("Get user by ID", "user", user.ID)
-		c.JSON(200, gin.H{"user": user})
+		c.JSON(200, gin.H{"user": entities.NewUserResponse(user)})
 	})
 
-	userRoutes.PUT("/:id", func(c *gin.Context) {
+	userRoutes.PUT("/:id", s.AuthenticatedUserMiddleware(), func(c *gin.Context) {
 		id := c.Param("id")
-		var input entities.User
+		if !canAccessUser(c, id) {
+			c.JSON(403, gin.H{"error": "Forbidden"})
+			return
+		}
+		var input struct {
+			Name   string `json:"name"`
+			Email  string `json:"email"`
+			Avatar string `json:"avatar"`
+		}
 		if err := c.ShouldBindJSON(&input); err != nil {
 			slog.Error("Failed to bind JSON", err)
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
-		input.ID = id
+		updatedInput := entities.User{ID: id, Name: input.Name, Email: input.Email, Avatar: input.Avatar}
 
 		dataInput := map[string]string{}
 		if input.Email != "" {
@@ -149,7 +177,7 @@ func (s *Server) inicializeUserHttpHandler() {
 			dataInput["name"] = input.Name
 		}
 
-		if err := userHttpHandler.Repo.UpdateUser(&input); err != nil {
+		if err := userHttpHandler.Repo.UpdateUser(&updatedInput); err != nil {
 			slog.Error("Failed to update user", err)
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
@@ -169,10 +197,10 @@ func (s *Server) inicializeUserHttpHandler() {
 		}
 
 		slog.Info("User updated successfully", "user", updatedUser.ID)
-		c.JSON(200, gin.H{"message": "User updated successfully"})
+		c.JSON(200, gin.H{"message": "User updated successfully", "user": entities.NewUserResponse(updatedUser)})
 	})
 
-	userRoutes.DELETE("/:id", func(c *gin.Context) {
+	userRoutes.DELETE("/:id", s.AdminPrivilegeMiddleware(), func(c *gin.Context) {
 		id := c.Param("id")
 		if err := userHttpHandler.Repo.DeleteUser(id); err != nil {
 			slog.Error("Failed to delete user", err)
@@ -183,7 +211,7 @@ func (s *Server) inicializeUserHttpHandler() {
 		c.JSON(200, gin.H{"message": "User deleted successfully"})
 	})
 
-	userRoutes.GET("/account/:email", func(c *gin.Context) {
+	userRoutes.GET("/account/:email", s.AuthenticatedUserMiddleware(), func(c *gin.Context) {
 		email := c.Param("email")
 		user, err := userHttpHandler.Repo.GetUserByEmail(email)
 		if err != nil {
@@ -191,8 +219,12 @@ func (s *Server) inicializeUserHttpHandler() {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+		if !canAccessUser(c, user.ID) {
+			c.JSON(403, gin.H{"error": "Forbidden"})
+			return
+		}
 		slog.Info("Get user by email", "user", user.Email)
-		c.JSON(200, gin.H{"user": user})
+		c.JSON(200, gin.H{"user": entities.NewUserResponse(user)})
 	})
 
 	userRoutes.GET("/test", s.ValidateRSAKeyMiddleware(), func(c *gin.Context) {
@@ -200,7 +232,7 @@ func (s *Server) inicializeUserHttpHandler() {
 		c.JSON(200, gin.H{"message": "Test successful"})
 	})
 
-	userRoutes.GET("/external/:id", func(c *gin.Context) {
+	userRoutes.GET("/external/:id", s.AdminPrivilegeMiddleware(), func(c *gin.Context) {
 		id := c.Param("id")
 		user, err := userHttpHandler.Repo.GetUserByExternalID(id)
 		if err != nil {
@@ -209,7 +241,7 @@ func (s *Server) inicializeUserHttpHandler() {
 			return
 		}
 		slog.Info("Get user by external ID", "user", user.ID)
-		c.JSON(200, gin.H{"user": user})
+		c.JSON(200, gin.H{"user": entities.NewUserResponse(user)})
 	})
 
 	userRoutes.GET("/check-rsa", s.ValidateRSAKeyMiddleware(), func(c *gin.Context) {
@@ -236,6 +268,7 @@ func (s *Server) inicializeUserHttpHandler() {
 		}
 
 		// generate JWT token
+		user.Role = entities.CanonicalRole(user.Role)
 		token, err := utils.GenerateJWTWithRole(user.ID, user.Email, user.Role)
 		if err != nil {
 			slog.Error("Failed to generate JWT token", err)
@@ -252,7 +285,7 @@ func (s *Server) inicializeUserHttpHandler() {
 		}
 
 		slog.Info("User logged in successfully", "user", user.Email)
-		c.JSON(200, gin.H{"user": user})
+		c.JSON(200, gin.H{"user": entities.NewUserResponse(user)})
 	})
 
 	// route to check user token signature

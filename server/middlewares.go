@@ -1,9 +1,11 @@
 package server
 
 import (
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
+	"user-auth/user/entities"
 	"user-auth/utils"
 
 	"github.com/gin-contrib/cors"
@@ -35,23 +37,46 @@ func (s *Server) initializeMiddlewares() {
 
 func (s *Server) ValidateRSAKeyMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Request.Header.Get("Authorization") == "" {
-			c.JSON(401, gin.H{"error": "Unauthorized"})
-			c.Abort()
-			return
-		}
-		// remove Bearer prefix if present
-		if len(c.Request.Header.Get("Authorization")) > 7 && c.Request.Header.Get("Authorization")[:7] == "Bearer " {
-			c.Request.Header.Set("Authorization", c.Request.Header.Get("Authorization")[7:])
-		}
-		ok := utils.ValidateJWTToken(c.Request.Header.Get("Authorization"))
-		if !ok {
+		if _, err := parseRequestClaims(c); err != nil {
 			c.JSON(401, gin.H{"error": "Unauthorized"})
 			c.Abort()
 			return
 		}
 		c.Next()
 
+	}
+}
+
+func (s *Server) AuthenticatedUserMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, err := parseRequestClaims(c)
+		if err != nil {
+			c.JSON(401, gin.H{"error": "Unauthorized"})
+			c.Abort()
+			return
+		}
+
+		id, _ := claims["id"].(string)
+		subject, _ := claims["sub"].(string)
+		if id == "" {
+			id = subject
+		}
+		if id == "" || (subject != "" && subject != id) {
+			c.JSON(401, gin.H{"error": "Unauthorized"})
+			c.Abort()
+			return
+		}
+
+		role, ok := claims["role"].(string)
+		if !ok || strings.TrimSpace(role) == "" {
+			c.JSON(401, gin.H{"error": "Unauthorized"})
+			c.Abort()
+			return
+		}
+
+		c.Set("auth_user_id", id)
+		c.Set("auth_user_role", entities.CanonicalRole(role))
+		c.Next()
 	}
 }
 
@@ -67,17 +92,42 @@ func (s *Server) AdminPrivilegeMiddleware() gin.HandlerFunc {
 }
 
 func isAdminRequest(c *gin.Context) bool {
-	authorization := strings.TrimSpace(c.GetHeader("Authorization"))
-	if strings.HasPrefix(authorization, "Bearer ") {
-		authorization = strings.TrimSpace(strings.TrimPrefix(authorization, "Bearer "))
-	}
-	if authorization == "" {
-		return false
-	}
-	claims, err := utils.ParseJWTTokenClaims(authorization)
+	claims, err := parseRequestClaims(c)
 	if err != nil {
 		return false
 	}
+	id, _ := claims["id"].(string)
+	subject, _ := claims["sub"].(string)
+	if id == "" {
+		id = subject
+	}
+	if id == "" || (subject != "" && subject != id) {
+		return false
+	}
 	role, ok := claims["role"].(string)
-	return ok && role == "admin"
+	return ok && entities.CanonicalRole(role) == entities.RoleAdmin
+}
+
+func parseRequestClaims(c *gin.Context) (map[string]interface{}, error) {
+	token := strings.TrimSpace(c.GetHeader("Authorization"))
+	if strings.HasPrefix(token, "Bearer ") {
+		token = strings.TrimSpace(strings.TrimPrefix(token, "Bearer "))
+	}
+	if token == "" {
+		token, _ = c.Cookie("token")
+	}
+	if token == "" {
+		return nil, errors.New("missing authentication token")
+	}
+	claims, err := utils.ParseJWTTokenClaims(token)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}(claims), nil
+}
+
+func canAccessUser(c *gin.Context, userID string) bool {
+	authUserID, _ := c.Get("auth_user_id")
+	role, _ := c.Get("auth_user_role")
+	return authUserID == userID || role == entities.RoleAdmin
 }
